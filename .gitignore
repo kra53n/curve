@@ -1,0 +1,12 @@
+*.out
+*.exe
+*.exe.old
+*.dll
+*.txt
+
+*.obj
+*.o
+
+test*
+
+build.c

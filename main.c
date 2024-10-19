@@ -224,6 +224,16 @@ void context_menu_invoke(ContextMenu *context_menu) {
     context_menu->boundary.x = mouse.x - context_menu->padding;
     context_menu->boundary.y = mouse.y - context_menu->padding;
 
+    float beyound;
+    if ((beyound = context_menu->boundary.x + context_menu->boundary.width - screen_width) > 0) {
+        context_menu->pos.x -= beyound;
+        context_menu->boundary.x -= beyound - context_menu->padding;
+    }
+    if ((beyound = context_menu->boundary.y + context_menu->boundary.height - screen_height) > 0) {
+        context_menu->pos.y -= beyound;
+        context_menu->boundary.y -= beyound - context_menu->padding;
+    }
+
     for (int i = 0; i < context_menu->options_num; i++) {
         context_menu->animations[i] = -1.0f;
     }
@@ -287,7 +297,7 @@ void context_menu_draw(ContextMenu *context_menu) {
         pos.y += context_menu->sz + context_menu->padding;
     }
 
-    drawr(context_menu->boundary, RED);
+    /* drawr(context_menu->boundary, RED); */
 }
 
 typedef struct {

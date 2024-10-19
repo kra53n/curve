@@ -19,7 +19,6 @@ Color point_col;
 Color point_col1;
 Color point_col2;
 float point_radius; // TODO(kra53n): make constants
-float point_radius_small;
 float point_radius_big;
 
 float overshoot_animation(float t) {
@@ -179,7 +178,7 @@ typedef struct {
                        */
 } ContextMenu;
 
-ContextMenu _context_menu_new(const ContextMenu *old, CONTEXT_MENU_TYPE type, const char *options[], int len) {
+ContextMenu _new_context_menu(const ContextMenu *old, CONTEXT_MENU_TYPE type, const char *options[], int len) {
     ContextMenu menu;
     menu.type = type;
     menu.font = old->font;
@@ -210,10 +209,10 @@ ContextMenu _context_menu_new(const ContextMenu *old, CONTEXT_MENU_TYPE type, co
     return menu;
 }
 
-#define context_menu_new(old_context_menu, type, ...)                    \
-    _context_menu_new(old_context_menu, type, (const char*[]){__VA_ARGS__}, sizeof((const char*[]){__VA_ARGS__}) / sizeof(const char*))
+#define new_context_menu(old_context_menu, type, ...)                    \
+    _new_context_menu(old_context_menu, type, (const char*[]){__VA_ARGS__}, sizeof((const char*[]){__VA_ARGS__}) / sizeof(const char*))
 
-void context_menu_invoke(ContextMenu *context_menu) {
+void invoke_context_menu(ContextMenu *context_menu) {
     Vector2 mouse = GetMousePosition();
     context_menu->react = true;
     context_menu->pos = (Vector2) {
@@ -241,7 +240,7 @@ void context_menu_invoke(ContextMenu *context_menu) {
     context_menu->choosed = -1;
 }
 
-void context_menu_update(ContextMenu *context_menu) {
+void update_context_menu(ContextMenu *context_menu) {
     Vector2 mouse = GetMousePosition();
     Vector2 pos = context_menu->pos;
     pos.y += context_menu->padding;
@@ -276,7 +275,7 @@ void context_menu_update(ContextMenu *context_menu) {
     }
 }
 
-void context_menu_draw(ContextMenu *context_menu) {
+void draw_context_menu(ContextMenu *context_menu) {
     Vector2 pos = context_menu->pos;
     pos.y += context_menu->padding;
     for (int i = 0; i < context_menu->options_num; i++) {
@@ -296,8 +295,6 @@ void context_menu_draw(ContextMenu *context_menu) {
         DrawTextEx(*context_menu->font, context_menu->options[i], (Vector2) {x, y}, sz, nil, context_menu->col);
         pos.y += context_menu->sz + context_menu->padding;
     }
-
-    /* drawr(context_menu->boundary, RED); */
 }
 
 typedef struct {
@@ -313,7 +310,7 @@ typedef struct {
     int point_drag;
 } Editor;
 
-void editor_update(Editor *e) {
+void update_editor(Editor *e) {
     Vector2 mouse = GetMousePosition();
     float sz = MIN(screen_width, screen_height);
 
@@ -345,7 +342,7 @@ void editor_update(Editor *e) {
     }
 }
 
-void editor_draw(const Editor *e) {
+void draw_editor(const Editor *e) {
     DrawRectangleLinesEx(e->r, e->thick, e->background_col);
     for (int i = 1; i < 5; i++) {
         float x = e->r.x + e->r.width * ((float)i/5);
@@ -388,7 +385,6 @@ int main(void) {
     point_radius = 10.0f;
     Color background_col = (Color){0x18, 0x18, 0x18, 0xff};
 
-    bool started = false;
     float b = 0.0f;
     Vector2 curve[100];
     int last_curve_point_index = -1;
@@ -406,8 +402,8 @@ int main(void) {
     context_menu.col = WHITE;
     context_menu.padding = 10;
 
-    ContextMenu interactive_menu = context_menu_new(&context_menu, CONTEXT_MENU_INTERACTIVE, "editor", "hello", "every", "one");
-    ContextMenu editor_menu = context_menu_new(&context_menu, CONTEXT_MENU_EDITOR, "interactive");
+    ContextMenu interactive_menu = new_context_menu(&context_menu, CONTEXT_MENU_INTERACTIVE, "editor");
+    ContextMenu editor_menu = new_context_menu(&context_menu, CONTEXT_MENU_EDITOR, "interactive");
     ContextMenu *current_menu = &interactive_menu;
 
     APP_STATE app_state = APP_INTERACTIVE;
@@ -452,7 +448,7 @@ int main(void) {
             }
 
             if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-                context_menu_invoke(current_menu);
+                invoke_context_menu(current_menu);
                 context_menu.choosed = app_state;
             } else {
                 if (!CheckCollisionPointRec(mouse, current_menu->boundary)) {
@@ -460,7 +456,7 @@ int main(void) {
                 }
             }
             if (current_menu->react) {
-                context_menu_update(current_menu);
+                update_context_menu(current_menu);
 
                 if (current_menu->type == CONTEXT_MENU_INTERACTIVE) {
                     if (current_menu->choosed >= 0) {
@@ -520,7 +516,7 @@ int main(void) {
                 draw_curve_points(&bc);
 
                 if (current_menu->react) {
-                    context_menu_draw(current_menu);
+                    draw_context_menu(current_menu);
                 }
             }
             EndDrawing();
@@ -534,14 +530,14 @@ int main(void) {
             }
 
             if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-                context_menu_invoke(current_menu);
+                invoke_context_menu(current_menu);
             } else {
                 if (!CheckCollisionPointRec(mouse, current_menu->boundary)) {
                     current_menu->react = false;
                 }
             }
             if (current_menu->react) {
-                context_menu_update(current_menu);
+                update_context_menu(current_menu);
 
                 if (current_menu->type == CONTEXT_MENU_EDITOR) {
                     if (current_menu->choosed >= 0) {
@@ -553,14 +549,14 @@ int main(void) {
                 }
             }
 
-            editor_update(&editor);
+            update_editor(&editor);
 
             BeginDrawing();
             {
                 ClearBackground(background_col);
-                editor_draw(&editor);
+                draw_editor(&editor);
                 if (current_menu->react) {
-                    context_menu_draw(current_menu);
+                    draw_context_menu(current_menu);
                 }
             }
             EndDrawing();

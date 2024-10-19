@@ -229,8 +229,8 @@ void invoke_context_menu(ContextMenu *context_menu) {
         context_menu->boundary.x -= beyound - context_menu->padding;
     }
     if ((beyound = context_menu->boundary.y + context_menu->boundary.height - screen_height) > 0) {
-        context_menu->pos.y -= beyound;
-        context_menu->boundary.y -= beyound - context_menu->padding;
+        context_menu->pos.y = mouse.y - context_menu->boundary.height + context_menu->padding;
+        context_menu->boundary.y = mouse.y - context_menu->boundary.height + context_menu->padding;
     }
 
     for (int i = 0; i < context_menu->options_num; i++) {
@@ -261,7 +261,7 @@ void update_context_menu(ContextMenu *context_menu) {
             } else if (context_menu->animations[i] >= 2.0f) {
                 context_menu->animations[i] = 2.0f;
             }
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
                 context_menu->choosed = i;
                 context_menu->react = false;
             }
@@ -306,7 +306,6 @@ typedef struct {
     Color line_col;
     Color line_col1;
     Vector2 points[4];
-    float point_rad;
     int point_drag;
 } Editor;
 
@@ -326,7 +325,7 @@ void update_editor(Editor *e) {
         p->x = p->x * e->r.width + e->r.x;
         p->y = (1 - p->y) * e->r.height + e->r.y;
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            if (CheckCollisionPointCircle(mouse, (Vector2){p->x, p->y}, e->point_rad)) {
+            if (CheckCollisionPointCircle(mouse, (Vector2){p->x, p->y}, point_radius)) {
                 e->point_drag = i;
             }
         }
@@ -367,7 +366,7 @@ void draw_editor(const Editor *e) {
         Vector2 *p = &points[i];
         p->x = p->x * e->r.width + e->r.x;
         p->y = (1 - p->y) * e->r.height + e->r.y;
-        DrawCircleV(*p, e->point_rad, e->point_col);
+        DrawCircleV(*p, point_radius, e->point_col);
     }
     DrawSplineBezierCubic(points, 4, e->thick, e->line_col);
 }
@@ -404,7 +403,7 @@ int main(void) {
 
     ContextMenu interactive_menu = new_context_menu(&context_menu, CONTEXT_MENU_INTERACTIVE, "editor");
     ContextMenu editor_menu = new_context_menu(&context_menu, CONTEXT_MENU_EDITOR, "interactive");
-    ContextMenu *current_menu = &interactive_menu;
+    ContextMenu *curr_menu = &interactive_menu;
 
     APP_STATE app_state = APP_INTERACTIVE;
     Editor editor = {
@@ -414,7 +413,6 @@ int main(void) {
         .point_col = YELLOW,
         .line_col = YELLOW,
         .line_col1 = (Color){0x80, 0x80, 0x80, 0xff},
-        .point_rad = 12,
         .point_drag = -1,
         .points = {
             (Vector2){ 0.0f, 0.0f },
@@ -447,22 +445,21 @@ int main(void) {
                 curr_curve_point_index = -1;
             }
 
-            if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-                invoke_context_menu(current_menu);
-                context_menu.choosed = app_state;
+            if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && !curr_menu->react) {
+                invoke_context_menu(curr_menu);
             } else {
-                if (!CheckCollisionPointRec(mouse, current_menu->boundary)) {
-                    current_menu->react = false;
+                if (!CheckCollisionPointRec(mouse, curr_menu->boundary)) {
+                    curr_menu->react = false;
                 }
             }
-            if (current_menu->react) {
-                update_context_menu(current_menu);
+            if (curr_menu->react) {
+                update_context_menu(curr_menu);
 
-                if (current_menu->type == CONTEXT_MENU_INTERACTIVE) {
-                    if (current_menu->choosed >= 0) {
-                        if (strcmp(current_menu->options[current_menu->choosed], "editor") == 0) {
+                if (curr_menu->type == CONTEXT_MENU_INTERACTIVE) {
+                    if (curr_menu->choosed >= 0) {
+                        if (strcmp(curr_menu->options[curr_menu->choosed], "editor") == 0) {
                             app_state = APP_EDITOR;
-                            current_menu = &editor_menu;
+                            curr_menu = &editor_menu;
                         }
                     }
                 }
@@ -515,8 +512,8 @@ int main(void) {
                 draw_curve_connection_lines(&bc);
                 draw_curve_points(&bc);
 
-                if (current_menu->react) {
-                    draw_context_menu(current_menu);
+                if (curr_menu->react) {
+                    draw_context_menu(curr_menu);
                 }
             }
             EndDrawing();
@@ -529,21 +526,21 @@ int main(void) {
                 screen_height = GetScreenHeight();
             }
 
-            if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-                invoke_context_menu(current_menu);
+            if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && !curr_menu->react) {
+                invoke_context_menu(curr_menu);
             } else {
-                if (!CheckCollisionPointRec(mouse, current_menu->boundary)) {
-                    current_menu->react = false;
+                if (!CheckCollisionPointRec(mouse, curr_menu->boundary)) {
+                    curr_menu->react = false;
                 }
             }
-            if (current_menu->react) {
-                update_context_menu(current_menu);
+            if (curr_menu->react) {
+                update_context_menu(curr_menu);
 
-                if (current_menu->type == CONTEXT_MENU_EDITOR) {
-                    if (current_menu->choosed >= 0) {
-                        if (strcmp(current_menu->options[current_menu->choosed], "interactive") == 0) {
+                if (curr_menu->type == CONTEXT_MENU_EDITOR) {
+                    if (curr_menu->choosed >= 0) {
+                        if (strcmp(curr_menu->options[curr_menu->choosed], "interactive") == 0) {
                             app_state = APP_INTERACTIVE;
-                            current_menu = &interactive_menu;
+                            curr_menu = &interactive_menu;
                         }
                     }
                 }
@@ -555,8 +552,8 @@ int main(void) {
             {
                 ClearBackground(background_col);
                 draw_editor(&editor);
-                if (current_menu->react) {
-                    draw_context_menu(current_menu);
+                if (curr_menu->react) {
+                    draw_context_menu(curr_menu);
                 }
             }
             EndDrawing();

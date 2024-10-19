@@ -5,11 +5,12 @@
 
 #include "raylib.h"
 
+#include "utils.h"
+
 #define nil 0
 #define pi (atan2f(1, 1) * 4)
 #define MAX(a, b) (a > b ? a : b)
 #define MIN(a, b) (a < b ? a : b)
-#define CLAMP(a, b, m) ()
 
 int screen_width = 720;
 int screen_height = 460;
@@ -17,7 +18,9 @@ int screen_height = 460;
 Color point_col;
 Color point_col1;
 Color point_col2;
-float point_radius;
+float point_radius; // TODO(kra53n): make constants
+float point_radius_small;
+float point_radius_big;
 
 float overshoot_animation(float t) {
     if (t <= 0.0f) return 0.0f;
@@ -201,7 +204,7 @@ ContextMenu _context_menu_new(const ContextMenu *old, CONTEXT_MENU_TYPE type, co
         .x = 0,
         .y = 0,
         .width = menu.max_option_width + 4 * menu.padding,
-        .height = menu.padding * 2 + (menu.sz + menu.padding) * len,
+        .height = menu.padding * 3 + (menu.sz + menu.padding) * len,
     };
 
     return menu;
@@ -218,8 +221,8 @@ void context_menu_invoke(ContextMenu *context_menu) {
         .y = mouse.y + context_menu->padding,
     };
 
-    context_menu->boundary.x = mouse.x;
-    context_menu->boundary.y = mouse.y;
+    context_menu->boundary.x = mouse.x - context_menu->padding;
+    context_menu->boundary.y = mouse.y - context_menu->padding;
 
     for (int i = 0; i < context_menu->options_num; i++) {
         context_menu->animations[i] = -1.0f;
@@ -244,17 +247,18 @@ void context_menu_update(ContextMenu *context_menu) {
             context_menu->animations[i] += dt;
         }
         if (CheckCollisionPointRec(mouse, r)) {
-            if (context_menu->animations[i] < 0.0f) {
-                context_menu->animations[i] = 0.0f;
-            } else if (context_menu->animations[i] >= 1.0f) {
+            if (context_menu->animations[i] < 1.0f) {
+                context_menu->animations[i] = 1.0f;
+            } else if (context_menu->animations[i] >= 2.0f) {
                 context_menu->animations[i] = 2.0f;
             }
-
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 context_menu->choosed = i;
                 context_menu->react = false;
             }
-        } else if (context_menu->animations[i] >= 1.0f) {
+        } else if (context_menu->animations[i] > 1.0f) {
+            context_menu->animations[i] -= 1.0f;
+        } else if (0.98 <= context_menu->animations[i] && context_menu->animations[i] <= 1.0f) {
             context_menu->animations[i] = -1.0f;
         }
 
@@ -269,8 +273,12 @@ void context_menu_draw(ContextMenu *context_menu) {
         float x = pos.x + (context_menu->max_option_width/2 - context_menu->option_widths[i]/2);
         float y = pos.y;
         float sz = context_menu->sz;
-        if (0 <= context_menu->animations[i] && context_menu->animations[i] <= 1.0f) {
-            float scale = overshoot_animation(context_menu->animations[i]);
+        if (0 <= context_menu->animations[i] && context_menu->animations[i] <= 2.0f) {
+            float val = context_menu->animations[i];
+            if (context_menu->animations[i] >= 1.0f) {
+                val -= 1.0f;
+            }
+            float scale = overshoot_animation(val);
             sz *= scale;
             x += context_menu->option_widths[i]/2 * (1-scale);
             y += context_menu->sz/2 * (1-scale);
@@ -278,6 +286,8 @@ void context_menu_draw(ContextMenu *context_menu) {
         DrawTextEx(*context_menu->font, context_menu->options[i], (Vector2) {x, y}, sz, nil, context_menu->col);
         pos.y += context_menu->sz + context_menu->padding;
     }
+
+    drawr(context_menu->boundary, RED);
 }
 
 typedef struct {
@@ -386,7 +396,7 @@ int main(void) {
     context_menu.col = WHITE;
     context_menu.padding = 10;
 
-    ContextMenu interactive_menu = context_menu_new(&context_menu, CONTEXT_MENU_INTERACTIVE, "editor");
+    ContextMenu interactive_menu = context_menu_new(&context_menu, CONTEXT_MENU_INTERACTIVE, "editor", "hello", "every", "one");
     ContextMenu editor_menu = context_menu_new(&context_menu, CONTEXT_MENU_EDITOR, "interactive");
     ContextMenu *current_menu = &interactive_menu;
 

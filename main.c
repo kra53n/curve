@@ -7,6 +7,10 @@
 
 #include "utils.h"
 
+// TODO(kra53n): make glow affect for circles
+
+// TODO(kra53n): space should start and then if it was pressed again should stop cirve computing
+
 #define nil 0
 #define pi (atan2f(1, 1) * 4)
 #define MAX(a, b) (a > b ? a : b)
@@ -18,8 +22,8 @@ int screen_height = 460;
 Color point_col;
 Color point_col1;
 Color point_col2;
-float point_radius; // TODO(kra53n): make constants
-float point_radius_big;
+const float point_radius = 10.0f; // TODO(kra53n): make constants
+const float point_radius_big = 20.0f;
 
 float overshoot_animation(float t) {
     if (t <= 0.0f) return 0.0f;
@@ -32,6 +36,8 @@ typedef enum {
     APP_EDITOR,
 } APP_STATE;
 
+// TODO(kra53n): replace using points and inner points in [0..1] values,
+// instead use normal coords but we must process windwos resizing correctly
 typedef struct {
     int n;
     int edges;
@@ -40,12 +46,6 @@ typedef struct {
     Vector2 curr_point;
     int selected_point;
 } BezierCurve;
-
-void draw_points(BezierCurve *bc) {
-    for (int i = 0; i < bc->n; i++) {
-        DrawCircle(bc->points[i].x * screen_width, bc->points[i].y * screen_height, point_radius, point_col);
-    }
-}
 
 // b - B(t) from https://en.wikipedia.org/wiki/B%C3%A9zier_curve
 void compute_curve(BezierCurve *bc, float b, Vector2 *points, int n, int edges) {
@@ -77,7 +77,7 @@ void touch_curve_point(BezierCurve *bc) {
             .x = bc->points[i].x * screen_width,
             .y = bc->points[i].y * screen_height
         };
-        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointCircle(mouse, p, point_radius + 5.0f)) {
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointCircle(mouse, p, point_radius_big)) {
             bc->selected_point = i;
             break;
         }
@@ -116,6 +116,7 @@ void draw_curve_points(const BezierCurve *bc) {
             col = point_col1;
         }
         DrawCircle(p.x * screen_width, p.y * screen_height, point_radius, col);
+        drawc(p.x * screen_width, p.y * screen_height, point_radius_big, col);
     }
 }
 
@@ -164,7 +165,7 @@ typedef struct {
     Vector2 pos;
     Rectangle boundary; // MAYBE(kra53n): rename to bound
 
-    char options_num;
+    char n;
     const char **options;
     float *option_widths;
     int max_option_width; // MAYBE(kra53n): rename to max_width
@@ -173,8 +174,8 @@ typedef struct {
     int choosed;
 
     float *animations; /* -1..0 - sleep
-                          0..1 - play
-                          1..2 - stay sleep while mouse continue hovers
+                           0..1 - play
+                           1..2 - play when mouse hovers option
                        */
 } ContextMenu;
 
@@ -186,7 +187,7 @@ ContextMenu _new_context_menu(const ContextMenu *old, CONTEXT_MENU_TYPE type, co
     menu.padding = old->padding;
     menu.sz = old->sz;
     menu.react = false;
-    menu.options_num = len;
+    menu.n = len;
     menu.options= options;
     menu.option_widths = (float*)malloc(sizeof(float) * len);
     menu.max_option_width = 0.0f;
@@ -233,7 +234,7 @@ void invoke_context_menu(ContextMenu *context_menu) {
         context_menu->boundary.y = mouse.y - context_menu->boundary.height + context_menu->padding;
     }
 
-    for (int i = 0; i < context_menu->options_num; i++) {
+    for (int i = 0; i < context_menu->n; i++) {
         context_menu->animations[i] = -1.0f;
     }
 
@@ -245,7 +246,7 @@ void update_context_menu(ContextMenu *context_menu) {
     Vector2 pos = context_menu->pos;
     pos.y += context_menu->padding;
     float dt = GetFrameTime();
-    for (int i = 0; i < context_menu->options_num; i++) {
+    for (int i = 0; i < context_menu->n; i++) {
         Rectangle r = {
             .x = pos.x,
             .y = pos.y,
@@ -278,7 +279,7 @@ void update_context_menu(ContextMenu *context_menu) {
 void draw_context_menu(ContextMenu *context_menu) {
     Vector2 pos = context_menu->pos;
     pos.y += context_menu->padding;
-    for (int i = 0; i < context_menu->options_num; i++) {
+    for (int i = 0; i < context_menu->n; i++) {
         float x = pos.x + (context_menu->max_option_width/2 - context_menu->option_widths[i]/2);
         float y = pos.y;
         float sz = context_menu->sz;
@@ -325,7 +326,7 @@ void update_editor(Editor *e) {
         p->x = p->x * e->r.width + e->r.x;
         p->y = (1 - p->y) * e->r.height + e->r.y;
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            if (CheckCollisionPointCircle(mouse, (Vector2){p->x, p->y}, point_radius)) {
+            if (CheckCollisionPointCircle(mouse, (Vector2){p->x, p->y}, point_radius_big)) {
                 e->point_drag = i;
             }
         }
@@ -381,7 +382,6 @@ int main(void) {
     point_col = ColorFromHSV(57, .78f, .87f);
     point_col1 = ColorFromHSV(254, .78f, .87f);
     point_col2 = ColorFromHSV(0, 1.f, 1.f);
-    point_radius = 10.0f;
     Color background_col = (Color){0x18, 0x18, 0x18, 0xff};
 
     float b = 0.0f;
@@ -401,7 +401,7 @@ int main(void) {
     context_menu.col = WHITE;
     context_menu.padding = 10;
 
-    ContextMenu interactive_menu = new_context_menu(&context_menu, CONTEXT_MENU_INTERACTIVE, "editor");
+    ContextMenu interactive_menu = new_context_menu(&context_menu, CONTEXT_MENU_INTERACTIVE, "editor", "hello", "how", "are", "you");
     ContextMenu editor_menu = new_context_menu(&context_menu, CONTEXT_MENU_EDITOR, "interactive");
     ContextMenu *curr_menu = &interactive_menu;
 
@@ -513,6 +513,7 @@ int main(void) {
                 draw_curve_points(&bc);
 
                 if (curr_menu->react) {
+                    // TODO(kra53): blur and shadow background
                     draw_context_menu(curr_menu);
                 }
             }

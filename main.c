@@ -391,7 +391,7 @@ int main(void) {
     int font_sz = 32;
 
     BezierCurve bc;
-    //init_quad_curve(&bc); 
+    /* init_quad_curve(&bc);  */
     init_cubic_curve(&bc);
 
     Font font = LoadFontEx("assets/Alegreya-Regular.ttf", font_sz, nil, nil);
@@ -401,7 +401,7 @@ int main(void) {
     context_menu.col = WHITE;
     context_menu.padding = 10;
 
-    ContextMenu interactive_menu = new_context_menu(&context_menu, CONTEXT_MENU_INTERACTIVE, "editor", "hello", "how", "are", "you");
+    ContextMenu interactive_menu = new_context_menu(&context_menu, CONTEXT_MENU_INTERACTIVE, "editor", "reset", "increase", "decrease");
     ContextMenu editor_menu = new_context_menu(&context_menu, CONTEXT_MENU_EDITOR, "interactive");
     ContextMenu *curr_menu = &interactive_menu;
 
@@ -460,6 +460,15 @@ int main(void) {
                         if (strcmp(curr_menu->options[curr_menu->choosed], "editor") == 0) {
                             app_state = APP_EDITOR;
                             curr_menu = &editor_menu;
+                        } else if (strcmp(curr_menu->options[curr_menu->choosed], "reset") == 0) {
+                            for (int i = 0; i < bc.n; i++) {
+                                bc.points[i].x = (i / (float)(bc.n-1)) * 0.7 + 0.15;
+                                bc.points[i].y = 0.5f;
+                            }
+                            b = 0.0f;
+                            last_curve_point_index = -1;
+                            curr_curve_point_index = -1;
+                        } else if (strcmp(curr_menu->options[curr_menu->choosed], "increase") == 0) {
                         }
                     }
                 }

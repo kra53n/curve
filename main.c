@@ -466,10 +466,10 @@ int main(void) {
             }
 
             float dt = GetFrameTime();
+            b += dt / 3;
             if (b >= 1.0f) {
                 b = 1.0f;
             }
-            b += dt / 3;
 
             if (IsKeyDown(KEY_SPACE)) {
                 b = 0.0f;

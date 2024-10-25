@@ -144,8 +144,8 @@ void init_cubic_curve(BezierCurve *bc) {
     bc->points[1] = (Vector2) { 0.4f, 0.8f, };
     bc->points[2] = (Vector2) { 0.6f, 0.8f, };
     bc->points[3] = (Vector2) { 0.8f, 0.2f, };
-    bc->edges = count_curve_edges(20);
-    bc->inner_points = (Vector2*)malloc(sizeof(Vector2) * bc->edges);
+    bc->edges = count_curve_edges(bc->n);
+    bc->inner_points = (Vector2*)malloc(sizeof(Vector2) * count_curve_edges(20));
     bc->selected_point = -1;
 }
 
@@ -558,6 +558,7 @@ int main(void) {
                                 interactive.bc.points[idx].x = (interactive.bc.points[idx-1].x + interactive.bc.points[idx+1].x) / 2;
                                 interactive.bc.points[idx].y =  (interactive.bc.points[idx-1].y + interactive.bc.points[idx+1].y) / 2;
                                 interactive.bc.n++;
+                                interactive.bc.edges = count_curve_edges(interactive.bc.n);
                                 nil_b_in_interactive(&interactive);
                             }
                         } else if (strcmp(curr_menu->options[curr_menu->choosed], "decrease") == 0) {
@@ -568,6 +569,7 @@ int main(void) {
                                 }
                                 memmove(interactive.bc.points+(idx), interactive.bc.points+(idx+1), sizeof(Vector2)*(interactive.bc.n-idx));
                                 interactive.bc.n--;
+                                interactive.bc.edges = count_curve_edges(interactive.bc.n);
                                 nil_b_in_interactive(&interactive);
                             }
                         }

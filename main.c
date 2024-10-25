@@ -163,14 +163,14 @@ typedef struct {
     int sz;
 
     Vector2 pos;
-    Rectangle boundary; // MAYBE(kra53n): rename to bound
+    Rectangle bound;
 
     char n;
     const char **options;
     float *option_widths;
-    int max_option_width; // MAYBE(kra53n): rename to max_width
+    int max_option_width;
 
-    bool react; // MAYBE(kra53n): ranme to active
+    bool active;
     int choosed;
 
     float *animations; /* -1..0 - sleep
@@ -186,7 +186,7 @@ ContextMenu _new_context_menu(const ContextMenu *old, CONTEXT_MENU_TYPE type, co
     menu.col = old->col;
     menu.padding = old->padding;
     menu.sz = old->sz;
-    menu.react = false;
+    menu.active = false;
     menu.n = len;
     menu.options= options;
     menu.option_widths = (float*)malloc(sizeof(float) * len);
@@ -200,7 +200,7 @@ ContextMenu _new_context_menu(const ContextMenu *old, CONTEXT_MENU_TYPE type, co
         menu.animations[i] = -1.0f;
     }
 
-    menu.boundary = (Rectangle) {
+    menu.bound = (Rectangle) {
         .x = 0,
         .y = 0,
         .width = menu.max_option_width + 4 * menu.padding,
@@ -215,23 +215,23 @@ ContextMenu _new_context_menu(const ContextMenu *old, CONTEXT_MENU_TYPE type, co
 
 void invoke_context_menu(ContextMenu *context_menu) {
     Vector2 mouse = GetMousePosition();
-    context_menu->react = true;
+    context_menu->active = true;
     context_menu->pos = (Vector2) {
         .x = mouse.x + context_menu->padding,
         .y = mouse.y + context_menu->padding,
     };
 
-    context_menu->boundary.x = mouse.x - context_menu->padding;
-    context_menu->boundary.y = mouse.y - context_menu->padding;
+    context_menu->bound.x = mouse.x - context_menu->padding;
+    context_menu->bound.y = mouse.y - context_menu->padding;
 
     float beyound;
-    if ((beyound = context_menu->boundary.x + context_menu->boundary.width - screen_width) > 0) {
+    if ((beyound = context_menu->bound.x + context_menu->bound.width - screen_width) > 0) {
         context_menu->pos.x -= beyound;
-        context_menu->boundary.x -= beyound - context_menu->padding;
+        context_menu->bound.x -= beyound - context_menu->padding;
     }
-    if ((beyound = context_menu->boundary.y + context_menu->boundary.height - screen_height) > 0) {
-        context_menu->pos.y = mouse.y - context_menu->boundary.height + context_menu->padding;
-        context_menu->boundary.y = mouse.y - context_menu->boundary.height + context_menu->padding;
+    if ((beyound = context_menu->bound.y + context_menu->bound.height - screen_height) > 0) {
+        context_menu->pos.y = mouse.y - context_menu->bound.height + context_menu->padding;
+        context_menu->bound.y = mouse.y - context_menu->bound.height + context_menu->padding;
     }
 
     for (int i = 0; i < context_menu->n; i++) {
@@ -264,7 +264,7 @@ void update_context_menu(ContextMenu *context_menu) {
             }
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
                 context_menu->choosed = i;
-                context_menu->react = false;
+                context_menu->active = false;
             }
         } else if (context_menu->animations[i] > 1.0f) {
             context_menu->animations[i] -= 1.0f;
@@ -296,6 +296,66 @@ void draw_context_menu(ContextMenu *context_menu) {
         DrawTextEx(*context_menu->font, context_menu->options[i], (Vector2) {x, y}, sz, nil, context_menu->col);
         pos.y += context_menu->sz + context_menu->padding;
     }
+}
+
+typedef struct {
+    Vector2 curve[100];
+    int last_curve_point_index;
+    int curr_curve_point_index;
+    float b;
+    BezierCurve bc;
+} Interactive;
+
+void update_interactive(Interactive *i) {
+    float dt = GetFrameTime();
+    i->b += dt / 3;
+    if (i->b >= 1.0f) {
+        i->b = 1.0f;
+    }
+
+    if (IsKeyDown(KEY_SPACE)) {
+        i->b = 0.0f;
+        i->last_curve_point_index = -1;
+        i->curr_curve_point_index = -1;
+    }
+
+    touch_curve_point(&i->bc);
+    if (i->bc.selected_point >= 0) {
+        i->b = 0.0f;
+        i->last_curve_point_index = -1;
+        i->curr_curve_point_index = -1;
+    }
+
+    int new_curve_point_index = (int)(i->b * 100);
+    if (new_curve_point_index - i->last_curve_point_index > 0) {
+        i->curr_curve_point_index++;
+        i->last_curve_point_index = new_curve_point_index;
+        if (i->curr_curve_point_index >= 100) {
+            i->curr_curve_point_index = 100-1;
+        }
+        i->curve[i->curr_curve_point_index] = i->bc.curr_point;
+    }
+}
+
+void nil_b_in_interactive(Interactive *i) {
+    i->b = 0.0f;
+    i->last_curve_point_index = -1;
+    i->curr_curve_point_index = -1;
+}
+
+void draw_interactive(Interactive *i) {
+    if (i->curr_curve_point_index >= 2){
+        for (int j = 0; j < i->curr_curve_point_index; j++) {
+            Vector2 p1 = i->curve[j];
+            Vector2 p2 = i->curve[j+1];
+            p1.x *= screen_width; p1.y *= screen_height;
+            p2.x *= screen_width; p2.y *= screen_height;
+            DrawLineEx(p1, p2, 3.f, point_col);
+        }
+    }
+    compute_curve(&i->bc, i->b, i->bc.points, i->bc.n, 0);
+    draw_curve_connection_lines(&i->bc);
+    draw_curve_points(&i->bc);
 }
 
 typedef struct {
@@ -384,15 +444,7 @@ int main(void) {
     point_col2 = ColorFromHSV(0, 1.f, 1.f);
     Color background_col = (Color){0x18, 0x18, 0x18, 0xff};
 
-    float b = 0.0f;
-    Vector2 curve[100];
-    int last_curve_point_index = -1;
-    int curr_curve_point_index = -1;
     int font_sz = 32;
-
-    BezierCurve bc;
-    /* init_quad_curve(&bc);  */
-    init_cubic_curve(&bc);
 
     Font font = LoadFontEx("assets/Alegreya-Regular.ttf", font_sz, nil, nil);
     ContextMenu context_menu;
@@ -406,6 +458,14 @@ int main(void) {
     ContextMenu *curr_menu = &interactive_menu;
 
     APP_STATE app_state = APP_INTERACTIVE;
+    
+    Interactive interactive = {
+    	.last_curve_point_index = -1,
+    	.curr_curve_point_index = -1,
+    	.b = 0.0f,
+    };
+    init_cubic_curve(&interactive.bc);
+    
     Editor editor = {
         .max_sz = 700,
         .thick = 2,
@@ -431,28 +491,24 @@ int main(void) {
             if (IsWindowResized()) {
                 screen_width = GetScreenWidth();
                 screen_height = GetScreenHeight();
-                b = 0.0f;
-                last_curve_point_index = -1;
-                curr_curve_point_index = -1;
+                nil_b_in_interactive(&interactive);
             }
             if (IsKeyPressed(KEY_F11)) {
                 window_flags ^= FLAG_BORDERLESS_WINDOWED_MODE;
                 SetWindowState(window_flags);
                 screen_width = GetScreenWidth();
                 screen_height = GetScreenHeight();
-                b = 0.0f;
-                last_curve_point_index = -1;
-                curr_curve_point_index = -1;
+                nil_b_in_interactive(&interactive);
             }
 
-            if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && !curr_menu->react) {
+            if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && !curr_menu->active) {
                 invoke_context_menu(curr_menu);
             } else {
-                if (!CheckCollisionPointRec(mouse, curr_menu->boundary)) {
-                    curr_menu->react = false;
+                if (!CheckCollisionPointRec(mouse, curr_menu->bound)) {
+                    curr_menu->active = false;
                 }
             }
-            if (curr_menu->react) {
+            if (curr_menu->active) {
                 update_context_menu(curr_menu);
 
                 if (curr_menu->type == CONTEXT_MENU_INTERACTIVE) {
@@ -461,67 +517,25 @@ int main(void) {
                             app_state = APP_EDITOR;
                             curr_menu = &editor_menu;
                         } else if (strcmp(curr_menu->options[curr_menu->choosed], "reset") == 0) {
-                            for (int i = 0; i < bc.n; i++) {
-                                bc.points[i].x = (i / (float)(bc.n-1)) * 0.7 + 0.15;
-                                bc.points[i].y = 0.5f;
+                            for (int i = 0; i < interactive.bc.n; i++) {
+                                interactive.bc.points[i].x = (i / (float)(interactive.bc.n-1)) * 0.7 + 0.15;
+                                interactive.bc.points[i].y = 0.5f;
                             }
-                            b = 0.0f;
-                            last_curve_point_index = -1;
-                            curr_curve_point_index = -1;
+                            nil_b_in_interactive(&interactive);
                         } else if (strcmp(curr_menu->options[curr_menu->choosed], "increase") == 0) {
                         }
                     }
                 }
             }
 
-            float dt = GetFrameTime();
-            b += dt / 3;
-            if (b >= 1.0f) {
-                b = 1.0f;
-            }
-
-            if (IsKeyDown(KEY_SPACE)) {
-                b = 0.0f;
-                last_curve_point_index = -1;
-                curr_curve_point_index = -1;
-            }
-
-            touch_curve_point(&bc);
-            if (bc.selected_point >= 0) {
-                b = 0.0f;
-                last_curve_point_index = -1;
-                curr_curve_point_index = -1;
-            }
-
-            int new_curve_point_index = (int)(b * 100);
-            if (new_curve_point_index - last_curve_point_index > 0) {
-                curr_curve_point_index++;
-                last_curve_point_index = new_curve_point_index;
-                if (curr_curve_point_index >= 100) {
-                    curr_curve_point_index = 100-1;
-                }
-                curve[curr_curve_point_index] = bc.curr_point;
-            }
-
-            if (curr_curve_point_index >= 2){
-                for (int i = 0; i < curr_curve_point_index; i++) {
-                    Vector2 p1 = curve[i];
-                    Vector2 p2 = curve[i+1];
-                    p1.x *= screen_width; p1.y *= screen_height;
-                    p2.x *= screen_width; p2.y *= screen_height;
-                    DrawLineEx(p1, p2, 3.f, point_col);
-                }
-            }
+            update_interactive(&interactive);
 
             BeginDrawing();
             {
                 ClearBackground(background_col);
 
-                compute_curve(&bc, b, bc.points, bc.n, 0);
-                draw_curve_connection_lines(&bc);
-                draw_curve_points(&bc);
-
-                if (curr_menu->react) {
+                draw_interactive(&interactive);
+                if (curr_menu->active) {
                     // TODO(kra53): blur and shadow background
                     draw_context_menu(curr_menu);
                 }
@@ -536,14 +550,14 @@ int main(void) {
                 screen_height = GetScreenHeight();
             }
 
-            if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && !curr_menu->react) {
+            if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && !curr_menu->active) {
                 invoke_context_menu(curr_menu);
             } else {
-                if (!CheckCollisionPointRec(mouse, curr_menu->boundary)) {
-                    curr_menu->react = false;
+                if (!CheckCollisionPointRec(mouse, curr_menu->bound)) {
+                    curr_menu->active = false;
                 }
             }
-            if (curr_menu->react) {
+            if (curr_menu->active) {
                 update_context_menu(curr_menu);
 
                 if (curr_menu->type == CONTEXT_MENU_EDITOR) {
@@ -562,7 +576,7 @@ int main(void) {
             {
                 ClearBackground(background_col);
                 draw_editor(&editor);
-                if (curr_menu->react) {
+                if (curr_menu->active) {
                     draw_context_menu(curr_menu);
                 }
             }

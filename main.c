@@ -363,7 +363,7 @@ int get_min_distance_idx_beetween_vecs(Vector2 *vs, int n) {
     int idx = 0;
     for (int i = n-2; i >= 0; i--) {
         float dist = Vector2Distance(vs[i], vs[i+1]);
-        if (min_dist >= dist) {
+        if (min_dist > dist) {
             min_dist = dist;
             idx = i;
         }
@@ -481,7 +481,7 @@ int main(void) {
     context_menu.col = WHITE;
     context_menu.padding = 10;
 
-    ContextMenu interactive_menu = new_context_menu(&context_menu, CONTEXT_MENU_INTERACTIVE, "editor", "reset", "increase", "decrease");
+    ContextMenu interactive_menu = new_context_menu(&context_menu, CONTEXT_MENU_INTERACTIVE, "increase", "decrease", "reset", "editor");
     ContextMenu editor_menu = new_context_menu(&context_menu, CONTEXT_MENU_EDITOR, "interactive");
     ContextMenu *curr_menu = &interactive_menu;
 
@@ -513,65 +513,65 @@ int main(void) {
     while (!WindowShouldClose()) {
         Vector2 mouse = GetMousePosition();
 
+        if (IsWindowResized()) {
+            screen_width = GetScreenWidth();
+            screen_height = GetScreenHeight();
+        }
+        if (IsKeyPressed(KEY_F11)) {
+            window_flags ^= FLAG_BORDERLESS_WINDOWED_MODE;
+            SetWindowState(window_flags);
+            screen_width = GetScreenWidth();
+            screen_height = GetScreenHeight();
+        }
+
+        if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && !curr_menu->active) {
+            invoke_context_menu(curr_menu);
+        } else {
+            if (!CheckCollisionPointRec(mouse, curr_menu->bound)) {
+                curr_menu->active = false;
+            }
+        }
+
         switch (app_state) {
         case APP_INTERACTIVE: {
-
-            if (IsWindowResized()) {
-                screen_width = GetScreenWidth();
-                screen_height = GetScreenHeight();
-                nil_b_in_interactive(&interactive);
-            }
-            if (IsKeyPressed(KEY_F11)) {
-                window_flags ^= FLAG_BORDERLESS_WINDOWED_MODE;
-                SetWindowState(window_flags);
-                screen_width = GetScreenWidth();
-                screen_height = GetScreenHeight();
+            if (IsWindowResized() || IsKeyPressed(KEY_F11)) {
                 nil_b_in_interactive(&interactive);
             }
 
-            if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && !curr_menu->active) {
-                invoke_context_menu(curr_menu);
-            } else {
-                if (!CheckCollisionPointRec(mouse, curr_menu->bound)) {
-                    curr_menu->active = false;
-                }
-            }
             if (curr_menu->active) {
                 update_context_menu(curr_menu);
 
                 // TODO(kra53n): show points num in context menu
-                if (curr_menu->type == CONTEXT_MENU_INTERACTIVE) {
-                    if (curr_menu->choosed >= 0) {
-                        if (strcmp(curr_menu->options[curr_menu->choosed], "editor") == 0) {
-                            app_state = APP_EDITOR;
-                            curr_menu = &editor_menu;
-                        } else if (strcmp(curr_menu->options[curr_menu->choosed], "reset") == 0) {
-                            for (int i = 0; i < interactive.bc.n; i++) {
-                                interactive.bc.points[i].x = (i / (float)(interactive.bc.n-1)) * 0.7 + 0.15;
-                                interactive.bc.points[i].y = 0.5f;
-                            }
+                if (curr_menu->type == CONTEXT_MENU_INTERACTIVE && curr_menu->choosed >= 0) {
+                    if (strcmp(curr_menu->options[curr_menu->choosed], "editor") == 0) {
+                        app_state = APP_EDITOR;
+                        curr_menu = &editor_menu;
+                    } else if (strcmp(curr_menu->options[curr_menu->choosed], "reset") == 0) {
+                        for (int i = 0; i < interactive.bc.n; i++) {
+                            interactive.bc.points[i].x = (i / (float)(interactive.bc.n-1)) * 0.7 + 0.15;
+                            interactive.bc.points[i].y = 0.5f;
+                        }
+                        nil_b_in_interactive(&interactive);
+                    } else if (strcmp(curr_menu->options[curr_menu->choosed], "increase") == 0) {
+                        if (interactive.bc.n+1 != 20) {
+                            int idx = get_max_distance_idx_beetween_vecs(interactive.bc.points, interactive.bc.n) + 1;
+                            memmove(interactive.bc.points+(idx+1), interactive.bc.points+(idx), sizeof(Vector2)*(interactive.bc.n-idx+1));
+                            interactive.bc.points[idx].x = (interactive.bc.points[idx-1].x + interactive.bc.points[idx+1].x) / 2;
+                            interactive.bc.points[idx].y =  (interactive.bc.points[idx-1].y + interactive.bc.points[idx+1].y) / 2;
+                            interactive.bc.n++;
+                            interactive.bc.edges = count_curve_edges(interactive.bc.n);
                             nil_b_in_interactive(&interactive);
-                        } else if (strcmp(curr_menu->options[curr_menu->choosed], "increase") == 0) {
-                            if (interactive.bc.n+1 != 20) {
-                                int idx = get_max_distance_idx_beetween_vecs(interactive.bc.points, interactive.bc.n) + 1;
-                                memmove(interactive.bc.points+(idx+1), interactive.bc.points+(idx), sizeof(Vector2)*(interactive.bc.n-idx+1));
-                                interactive.bc.points[idx].x = (interactive.bc.points[idx-1].x + interactive.bc.points[idx+1].x) / 2;
-                                interactive.bc.points[idx].y =  (interactive.bc.points[idx-1].y + interactive.bc.points[idx+1].y) / 2;
-                                interactive.bc.n++;
-                                interactive.bc.edges = count_curve_edges(interactive.bc.n);
-                                nil_b_in_interactive(&interactive);
+                        }
+                    } else if (strcmp(curr_menu->options[curr_menu->choosed], "decrease") == 0) {
+                        if (interactive.bc.n >= 3) {
+                            int idx = get_min_distance_idx_beetween_vecs(interactive.bc.points, interactive.bc.n);
+                            if (idx == 0) {
+                                idx = 1;
                             }
-                        } else if (strcmp(curr_menu->options[curr_menu->choosed], "decrease") == 0) {
-                            if (interactive.bc.n >= 3) {
-                                int idx = get_min_distance_idx_beetween_vecs(interactive.bc.points, interactive.bc.n);
-                                if (idx == 0) {
-                                    idx = 1;
-                                }
-                                memmove(interactive.bc.points+(idx), interactive.bc.points+(idx+1), sizeof(Vector2)*(interactive.bc.n-idx));
-                                interactive.bc.n--;
-                                interactive.bc.edges = count_curve_edges(interactive.bc.n);
-                                nil_b_in_interactive(&interactive);
-                            }
+                            memmove(interactive.bc.points+(idx), interactive.bc.points+(idx+1), sizeof(Vector2)*(interactive.bc.n-idx));
+                            interactive.bc.n--;
+                            interactive.bc.edges = count_curve_edges(interactive.bc.n);
+                            nil_b_in_interactive(&interactive);
                         }
                     }
                 }
@@ -593,19 +593,6 @@ int main(void) {
         } break;
 
         case APP_EDITOR: {
-
-            if (IsWindowResized()) {
-                screen_width = GetScreenWidth();
-                screen_height = GetScreenHeight();
-            }
-
-            if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && !curr_menu->active) {
-                invoke_context_menu(curr_menu);
-            } else {
-                if (!CheckCollisionPointRec(mouse, curr_menu->bound)) {
-                    curr_menu->active = false;
-                }
-            }
             if (curr_menu->active) {
                 update_context_menu(curr_menu);
 

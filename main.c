@@ -344,6 +344,33 @@ void nil_b_in_interactive(Interactive *i) {
     i->curr_curve_point_index = -1;
 }
 
+
+int get_max_distance_idx_beetween_vecs(Vector2 *vs, int n) {
+    float max_dist = 0.0f;
+    int idx = 0;
+    for (int i = n-2; i >= 0; i--) {
+        float dist = Vector2Distance(vs[i], vs[i+1]);
+        if (max_dist <= dist) {
+            max_dist = dist;
+            idx = i;
+        }
+    }
+    return idx;
+}
+
+int get_min_distance_idx_beetween_vecs(Vector2 *vs, int n) {
+    float min_dist = 33333.0f;
+    int idx = 0;
+    for (int i = n-2; i >= 0; i--) {
+        float dist = Vector2Distance(vs[i], vs[i+1]);
+        if (min_dist >= dist) {
+            min_dist = dist;
+            idx = i;
+        }
+    }
+    return idx;
+}
+
 void draw_interactive(Interactive *i) {
     if (i->curr_curve_point_index >= 2){
         for (int j = 0; j < i->curr_curve_point_index; j++) {
@@ -526,20 +553,21 @@ int main(void) {
                             nil_b_in_interactive(&interactive);
                         } else if (strcmp(curr_menu->options[curr_menu->choosed], "increase") == 0) {
                             if (interactive.bc.n+1 != 20) {
-                                float max_dist = 0.0f;
-                                int idx = 0;
-                                for (int i = interactive.bc.n-2; i >= 0; i--) {
-                                    float dist = Vector2Distance(interactive.bc.points[i], interactive.bc.points[i+1]);
-                                    if (max_dist <= dist) {
-                                        max_dist = dist;
-                                        idx = i;
-                                    }
-                                }
-                                idx++;
+                                int idx = get_max_distance_idx_beetween_vecs(interactive.bc.points, interactive.bc.n) + 1;
                                 memmove(interactive.bc.points+(idx+1), interactive.bc.points+(idx), sizeof(Vector2)*(interactive.bc.n-idx+1));
                                 interactive.bc.points[idx].x = (interactive.bc.points[idx-1].x + interactive.bc.points[idx+1].x) / 2;
                                 interactive.bc.points[idx].y =  (interactive.bc.points[idx-1].y + interactive.bc.points[idx+1].y) / 2;
                                 interactive.bc.n++;
+                                nil_b_in_interactive(&interactive);
+                            }
+                        } else if (strcmp(curr_menu->options[curr_menu->choosed], "decrease") == 0) {
+                            if (interactive.bc.n >= 3) {
+                                int idx = get_min_distance_idx_beetween_vecs(interactive.bc.points, interactive.bc.n);
+                                if (idx == 0) {
+                                    idx = 1;
+                                }
+                                memmove(interactive.bc.points+(idx), interactive.bc.points+(idx+1), sizeof(Vector2)*(interactive.bc.n-idx));
+                                interactive.bc.n--;
                                 nil_b_in_interactive(&interactive);
                             }
                         }

@@ -4,6 +4,7 @@
 #include <malloc.h>
 
 #include "raylib.h"
+#include "raymath.h"
 
 #include "utils.h"
 
@@ -138,12 +139,12 @@ void init_quad_curve(BezierCurve *bc) {
 
 void init_cubic_curve(BezierCurve *bc) {
     bc->n = 4;
-    bc->points = (Vector2*)malloc(sizeof(Vector2) * bc->n);
+    bc->points = (Vector2*)malloc(sizeof(Vector2) * 20);
     bc->points[0] = (Vector2) { 0.2f, 0.2f, };
     bc->points[1] = (Vector2) { 0.4f, 0.8f, };
     bc->points[2] = (Vector2) { 0.6f, 0.8f, };
     bc->points[3] = (Vector2) { 0.8f, 0.2f, };
-    bc->edges = count_curve_edges(bc->n);
+    bc->edges = count_curve_edges(20);
     bc->inner_points = (Vector2*)malloc(sizeof(Vector2) * bc->edges);
     bc->selected_point = -1;
 }
@@ -511,6 +512,7 @@ int main(void) {
             if (curr_menu->active) {
                 update_context_menu(curr_menu);
 
+                // TODO(kra53n): show points num in context menu
                 if (curr_menu->type == CONTEXT_MENU_INTERACTIVE) {
                     if (curr_menu->choosed >= 0) {
                         if (strcmp(curr_menu->options[curr_menu->choosed], "editor") == 0) {
@@ -523,6 +525,23 @@ int main(void) {
                             }
                             nil_b_in_interactive(&interactive);
                         } else if (strcmp(curr_menu->options[curr_menu->choosed], "increase") == 0) {
+                            if (interactive.bc.n+1 != 20) {
+                                float max_dist = 0.0f;
+                                int idx = 0;
+                                for (int i = interactive.bc.n-2; i >= 0; i--) {
+                                    float dist = Vector2Distance(interactive.bc.points[i], interactive.bc.points[i+1]);
+                                    if (max_dist <= dist) {
+                                        max_dist = dist;
+                                        idx = i;
+                                    }
+                                }
+                                idx++;
+                                memmove(interactive.bc.points+(idx+1), interactive.bc.points+(idx), sizeof(Vector2)*(interactive.bc.n-idx+1));
+                                interactive.bc.points[idx].x = (interactive.bc.points[idx-1].x + interactive.bc.points[idx+1].x) / 2;
+                                interactive.bc.points[idx].y =  (interactive.bc.points[idx-1].y + interactive.bc.points[idx+1].y) / 2;
+                                interactive.bc.n++;
+                                nil_b_in_interactive(&interactive);
+                            }
                         }
                     }
                 }

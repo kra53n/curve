@@ -13,3 +13,5 @@ int main(int argc, char **argv) {
     if (!nob_cmd_run_sync(run_prog_cmd)) return 1;
     return 0;
 }
+
+gcc -o shapes_easings_box_anim shapes_easings_box_anim.c -lraylib -lgdi32 -lwinmm

@@ -23,7 +23,7 @@ int screen_height = 460;
 Color point_col;
 Color point_col1;
 Color point_col2;
-const float point_radius = 10.0f; // TODO(kra53n): make constants
+const float point_radius = 10.0f;
 const float point_radius_big = 20.0f;
 
 float overshoot_animation(float t) {
@@ -37,8 +37,6 @@ typedef enum {
     APP_EDITOR,
 } APP_STATE;
 
-// TODO(kra53n): replace using points and inner points in [0..1] values,
-// instead use normal coords but we must process windwos resizing correctly
 typedef struct {
     int n;
     int edges;
@@ -174,6 +172,8 @@ typedef struct {
     bool active;
     int choosed;
 
+    float last_pressed;
+
     float *animations; /* -1..0 - sleep
                            0..1 - play
                            1..2 - play when mouse hovers option
@@ -214,67 +214,72 @@ ContextMenu _new_context_menu(const ContextMenu *old, CONTEXT_MENU_TYPE type, co
 #define new_context_menu(old_context_menu, type, ...)                    \
     _new_context_menu(old_context_menu, type, (const char*[]){__VA_ARGS__}, sizeof((const char*[]){__VA_ARGS__}) / sizeof(const char*))
 
-void invoke_context_menu(ContextMenu *context_menu) {
+void invoke_context_menu(ContextMenu *cm) {
     Vector2 mouse = GetMousePosition();
-    context_menu->active = true;
-    context_menu->pos = (Vector2) {
-        .x = mouse.x + context_menu->padding,
-        .y = mouse.y + context_menu->padding,
+    cm->active = true;
+    cm->pos = (Vector2) {
+        .x = mouse.x + cm->padding,
+        .y = mouse.y + cm->padding,
     };
 
-    context_menu->bound.x = mouse.x - context_menu->padding;
-    context_menu->bound.y = mouse.y - context_menu->padding;
+    cm->bound.x = mouse.x - cm->padding;
+    cm->bound.y = mouse.y - cm->padding;
 
     float beyound;
-    if ((beyound = context_menu->bound.x + context_menu->bound.width - screen_width) > 0) {
-        context_menu->pos.x -= beyound;
-        context_menu->bound.x -= beyound - context_menu->padding;
+    if ((beyound = cm->bound.x + cm->bound.width - screen_width) > 0) {
+        cm->pos.x -= beyound;
+        cm->bound.x -= beyound - cm->padding;
     }
-    if ((beyound = context_menu->bound.y + context_menu->bound.height - screen_height) > 0) {
-        context_menu->pos.y = mouse.y - context_menu->bound.height + context_menu->padding;
-        context_menu->bound.y = mouse.y - context_menu->bound.height + context_menu->padding;
-    }
-
-    for (int i = 0; i < context_menu->n; i++) {
-        context_menu->animations[i] = -1.0f;
+    if ((beyound = cm->bound.y + cm->bound.height - screen_height) > 0) {
+        cm->pos.y = mouse.y - cm->bound.height + cm->padding;
+        cm->bound.y = mouse.y - cm->bound.height + cm->padding;
     }
 
-    context_menu->choosed = -1;
+    for (int i = 0; i < cm->n; i++) {
+        cm->animations[i] = -1.0f;
+    }
+
+    cm->choosed = -1;
 }
 
-void update_context_menu(ContextMenu *context_menu) {
+void update_context_menu(ContextMenu *cm) {
     Vector2 mouse = GetMousePosition();
-    Vector2 pos = context_menu->pos;
-    pos.y += context_menu->padding;
+    Vector2 pos = cm->pos;
+    pos.y += cm->padding;
     float dt = GetFrameTime();
-    for (int i = 0; i < context_menu->n; i++) {
+    for (int i = 0; i < cm->n; i++) {
         Rectangle r = {
             .x = pos.x,
             .y = pos.y,
-            .width = context_menu->max_option_width,
-            .height = context_menu->sz,
+            .width = cm->max_option_width,
+            .height = cm->sz,
         };
-        if (context_menu->animations[i] >= 0.0f) {
-            context_menu->animations[i] += dt;
+        if (cm->animations[i] >= 0.0f) {
+            cm->animations[i] += dt;
         }
         if (CheckCollisionPointRec(mouse, r)) {
-            if (context_menu->animations[i] < 1.0f) {
-                context_menu->animations[i] = 1.0f;
-            } else if (context_menu->animations[i] >= 2.0f) {
-                context_menu->animations[i] = 2.0f;
+            if (cm->animations[i] < 1.0f) {
+                cm->animations[i] = 1.0f;
+            } else if (cm->animations[i] >= 2.0f) {
+                cm->animations[i] = 2.0f;
             }
-            if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-                context_menu->choosed = i;
-                context_menu->active = false;
+            if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) || IsMouseButtonReleased(MOUSE_BUTTON_RIGHT)) {
+                cm->choosed = i;
+                cm->active = false;
             }
-        } else if (context_menu->animations[i] > 1.0f) {
-            context_menu->animations[i] -= 1.0f;
-        } else if (0.98 <= context_menu->animations[i] && context_menu->animations[i] <= 1.0f) {
-            context_menu->animations[i] = -1.0f;
+        } else if (cm->animations[i] > 1.0f) {
+            cm->animations[i] -= 1.0f;
+        } else if (0.98 <= cm->animations[i] && cm->animations[i] <= 1.0f) {
+            cm->animations[i] = -1.0f;
         }
 
-        pos.y += context_menu->sz + context_menu->padding;
+        pos.y += cm->sz + cm->padding;
     }
+}
+
+void keep_context_menu(ContextMenu *cm) {
+    cm->active = true;
+    cm->choosed = -1;
 }
 
 void draw_context_menu(ContextMenu *context_menu) {
@@ -305,19 +310,25 @@ typedef struct {
     int curr_curve_point_index;
     float b;
     BezierCurve bc;
+    bool animate;
 } Interactive;
 
 void update_interactive(Interactive *i) {
-    float dt = GetFrameTime();
-    i->b += dt / 3;
-    if (i->b >= 1.0f) {
-        i->b = 1.0f;
+    if (i->animate) {
+        float dt = GetFrameTime();
+        i->b += dt / 3;
+        if (i->b >= 1.0f) {
+            i->b = 1.0f;
+        }
     }
 
-    if (IsKeyDown(KEY_SPACE)) {
-        i->b = 0.0f;
-        i->last_curve_point_index = -1;
-        i->curr_curve_point_index = -1;
+    if (IsKeyPressed(KEY_SPACE)) {
+        if (i->b >= 1.0f || (i->animate == false && i->b <= 0.01f)) {
+            i->b = 0.0f;
+            i->last_curve_point_index = -1;
+            i->curr_curve_point_index = -1;
+        }
+        i->animate = !i->animate;
     }
 
     touch_curve_point(&i->bc);
@@ -396,6 +407,8 @@ typedef struct {
     Color line_col1;
     Vector2 points[4];
     int point_drag;
+
+    float b;
 } Editor;
 
 void update_editor(Editor *e) {
@@ -428,6 +441,25 @@ void update_editor(Editor *e) {
         e->points[e->point_drag].x = (p.x - e->r.x) / e->r.width;
         e->points[e->point_drag].y = 1 - ((p.y - e->r.y) / e->r.height);
     }
+
+    float dt = GetFrameTime();
+    e->b += dt;
+    if (e->b >= 1.0f) {
+        e->b = 1.0f;
+    }
+
+    if (IsKeyPressed(KEY_SPACE)) {
+        e->b = 0.0f;
+    }
+}
+
+void draw_animated_square_in_editor(const Editor *e) {
+    float off = 50.0f;
+    float sz = 25.0f;
+    float x = e->r.x + e->r.width + off;
+    float start_y = e->r.y + e->r.height - sz;
+    float end_y = e->r.y;
+    DrawRectangle(x, Lerp(start_y, end_y, e->b), sz, sz, YELLOW);
 }
 
 void draw_editor(const Editor *e) {
@@ -458,6 +490,7 @@ void draw_editor(const Editor *e) {
         DrawCircleV(*p, point_radius, e->point_col);
     }
     DrawSplineBezierCubic(points, 4, e->thick, e->line_col);
+    draw_animated_square_in_editor(e);
 }
 
 int main(void) {
@@ -475,22 +508,24 @@ int main(void) {
     int font_sz = 32;
 
     Font font = LoadFontEx("assets/Alegreya-Regular.ttf", font_sz, nil, nil);
-    ContextMenu context_menu;
-    context_menu.font = &font;
-    context_menu.sz = font.baseSize;
-    context_menu.col = WHITE;
-    context_menu.padding = 10;
+    ContextMenu context_menu = {
+        .font = &font,
+        .sz = font.baseSize,
+        .col = WHITE,
+        .padding = 10,
+    };
 
     ContextMenu interactive_menu = new_context_menu(&context_menu, CONTEXT_MENU_INTERACTIVE, "increase", "decrease", "reset", "editor");
     ContextMenu editor_menu = new_context_menu(&context_menu, CONTEXT_MENU_EDITOR, "interactive");
     ContextMenu *curr_menu = &interactive_menu;
 
-    APP_STATE app_state = APP_INTERACTIVE;
+    APP_STATE app_state = APP_EDITOR;
     
     Interactive interactive = {
     	.last_curve_point_index = -1,
     	.curr_curve_point_index = -1,
     	.b = 0.0f,
+        .animate = false,
     };
     init_cubic_curve(&interactive.bc);
     
@@ -562,6 +597,7 @@ int main(void) {
                             interactive.bc.edges = count_curve_edges(interactive.bc.n);
                             nil_b_in_interactive(&interactive);
                         }
+                        keep_context_menu(curr_menu);
                     } else if (strcmp(curr_menu->options[curr_menu->choosed], "decrease") == 0) {
                         if (interactive.bc.n >= 3) {
                             int idx = get_min_distance_idx_beetween_vecs(interactive.bc.points, interactive.bc.n);
@@ -573,6 +609,7 @@ int main(void) {
                             interactive.bc.edges = count_curve_edges(interactive.bc.n);
                             nil_b_in_interactive(&interactive);
                         }
+                        keep_context_menu(curr_menu);
                     }
                 }
             }
@@ -596,12 +633,10 @@ int main(void) {
             if (curr_menu->active) {
                 update_context_menu(curr_menu);
 
-                if (curr_menu->type == CONTEXT_MENU_EDITOR) {
-                    if (curr_menu->choosed >= 0) {
-                        if (strcmp(curr_menu->options[curr_menu->choosed], "interactive") == 0) {
-                            app_state = APP_INTERACTIVE;
-                            curr_menu = &interactive_menu;
-                        }
+                if (curr_menu->type == CONTEXT_MENU_EDITOR && curr_menu->choosed >= 0) {
+                    if (strcmp(curr_menu->options[curr_menu->choosed], "interactive") == 0) {
+                        app_state = APP_INTERACTIVE;
+                        curr_menu = &interactive_menu;
                     }
                 }
             }

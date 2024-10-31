@@ -504,6 +504,81 @@ void draw_editor(const Editor *e) {
     draw_animated_square_in_editor(e);
 }
 
+int scan_nums_to_vecs(const char *s, Vector2 points[4], const char *err) {
+    int sz = 20;
+    int curr_num = 0;
+    int curr_ch = 0;
+    char nums[8][sz];
+    typedef enum {
+        Search,
+        Integer,
+        Fractional,
+    } State;
+    State state = Search;
+
+    for (; *s != nil; s++) {
+        if (curr_num > 8) {
+            strcpy((char*)err, "too many numbers, 4 expected");
+            return 1;
+        }
+        if (curr_ch >= sz) {
+            strcpy((char*)err, "too long number");
+            return 1;
+        }
+
+        for (int i = 0; i < 10; i++) {
+            if (*s == '0' + i) {
+                if (state == Search) {
+                    state = Integer;
+                }
+                nums[curr_num][curr_ch] = *s;
+                curr_ch++;
+                goto skip;
+            }
+        }
+
+        switch (*s) {
+        case '.': {
+            if (state == Fractional) {
+                strcpy((char*)err, "too many dots in number");
+                return 1;
+            }
+            state = Fractional;
+            nums[curr_num][curr_ch] = '.';
+            curr_ch++;
+        } break;
+        default: {
+            if (state != Search) {
+                nums[curr_num][curr_ch] = 0;
+                curr_num++;
+                curr_ch = 0;
+            }
+            state = Search;
+        } break;
+        }
+
+    skip: {}
+    }
+    if (state == Integer || state == Fractional) {
+        nums[curr_num][curr_ch] = 0;
+        curr_num++;
+    }
+
+    if (curr_num == 0 && curr_ch == 0) {
+        strcpy((char*)err, "was not read any number");
+        return 1;
+    } else if (curr_num != 8) {
+        strcpy((char*)err, "not enough numbers");
+        return 1;
+    }
+
+    for (int i = 0; i < curr_num; i += 2) {
+        points[i/2].x = (float)atof(nums[i]);
+        points[i/2].y = (float)atof(nums[i+1]);
+    }
+    return 0;
+}
+
 int main(void) {
     ConfigFlags window_flags = FLAG_WINDOW_RESIZABLE;
 
@@ -656,6 +731,10 @@ int main(void) {
 
                 if (curr_menu->type == CONTEXT_MENU_EDITOR && curr_menu->choosed >= 0) {
                     if (strcmp(curr_menu->options[curr_menu->choosed], "copy") == 0) {
+                    } else if (strcmp(curr_menu->options[curr_menu->choosed], "paste") == 0) {
+                        char err[256];
+                        scan_nums_to_vecs(GetClipboardText(), editor.points, err);
+                        printf("err: %s\n", err);
                     } else if (strcmp(curr_menu->options[curr_menu->choosed], "interactive") == 0) {
                         app_state = APP_INTERACTIVE;
                         curr_menu = &interactive_menu;

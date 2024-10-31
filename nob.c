@@ -14,4 +14,4 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-gcc -o shapes_easings_box_anim shapes_easings_box_anim.c -lraylib -lgdi32 -lwinmm
+/* gcc -o shapes_easings_box_anim shapes_easings_box_anim.c -lraylib -lgdi32 -lwinmm */

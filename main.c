@@ -53,7 +53,7 @@ void compute_curve(BezierCurve *bc, float b, Vector2 *points, int n, int edges) 
         bc->curr_point = points[0];
         return;
     }
-    Vector2 *inner_points = (Vector2*)malloc(sizeof(Vector2) * n-1);
+    Vector2 inner_points[n-1];
     Vector2 p;
     for (int i = 0; i < n-1; i++) {
         Vector2 p1 = points[i];
@@ -66,7 +66,6 @@ void compute_curve(BezierCurve *bc, float b, Vector2 *points, int n, int edges) 
     }
     edges++;
     compute_curve(bc, b, inner_points, n-1, edges);
-    free(inner_points);
 }
 
 void touch_curve_point(BezierCurve *bc) {
@@ -313,6 +312,12 @@ typedef struct {
     bool animate;
 } Interactive;
 
+void nil_b_in_interactive(Interactive *i) {
+    i->b = 0.0f;
+    i->last_curve_point_index = -1;
+    i->curr_curve_point_index = -1;
+}
+
 void update_interactive(Interactive *i) {
     if (i->animate) {
         float dt = GetFrameTime();
@@ -323,7 +328,10 @@ void update_interactive(Interactive *i) {
     }
 
     if (IsKeyPressed(KEY_SPACE)) {
-        if (i->b >= 1.0f || (i->animate == false && i->b <= 0.01f)) {
+        if (i->b >= 1.0f) {
+            nil_b_in_interactive(i);
+        }
+        if ((i->animate == false && i->b <= 0.01f)) {
             i->b = 0.0f;
             i->last_curve_point_index = -1;
             i->curr_curve_point_index = -1;
@@ -348,13 +356,6 @@ void update_interactive(Interactive *i) {
         i->curve[i->curr_curve_point_index] = i->bc.curr_point;
     }
 }
-
-void nil_b_in_interactive(Interactive *i) {
-    i->b = 0.0f;
-    i->last_curve_point_index = -1;
-    i->curr_curve_point_index = -1;
-}
-
 
 int get_max_distance_idx_beetween_vecs(Vector2 *vs, int n) {
     float max_dist = 0.0f;
@@ -383,14 +384,12 @@ int get_min_distance_idx_beetween_vecs(Vector2 *vs, int n) {
 }
 
 void draw_interactive(Interactive *i) {
-    if (i->curr_curve_point_index >= 2){
-        for (int j = 0; j < i->curr_curve_point_index; j++) {
-            Vector2 p1 = i->curve[j];
-            Vector2 p2 = i->curve[j+1];
-            p1.x *= screen_width; p1.y *= screen_height;
-            p2.x *= screen_width; p2.y *= screen_height;
-            DrawLineEx(p1, p2, 3.f, point_col);
-        }
+    for (int j = 1; j < i->curr_curve_point_index; j++) {
+        Vector2 p1 = i->curve[j];
+        Vector2 p2 = i->curve[j+1];
+        p1.x *= screen_width; p1.y *= screen_height;
+        p2.x *= screen_width; p2.y *= screen_height;
+        DrawLineEx(p1, p2, 3.f, point_col);
     }
     compute_curve(&i->bc, i->b, i->bc.points, i->bc.n, 0);
     draw_curve_connection_lines(&i->bc);
@@ -410,6 +409,16 @@ typedef struct {
 
     float b;
 } Editor;
+
+static inline Vector2 cubic_bezier(float t, const Vector2 nodes[4])
+{
+    float it = 1 - t;
+    Vector2 b = Vector2Scale(nodes[0], it*it*it);
+    b = Vector2Add(b, Vector2Scale(nodes[1], 3*it*it*t));
+    b = Vector2Add(b, Vector2Scale(nodes[2], 3*it*t*t));
+    b = Vector2Add(b, Vector2Scale(nodes[3], t*t*t));
+    return b;
+}
 
 void update_editor(Editor *e) {
     Vector2 mouse = GetMousePosition();
@@ -459,7 +468,9 @@ void draw_animated_square_in_editor(const Editor *e) {
     float x = e->r.x + e->r.width + off;
     float start_y = e->r.y + e->r.height - sz;
     float end_y = e->r.y;
-    DrawRectangle(x, Lerp(start_y, end_y, e->b), sz, sz, YELLOW);
+    /* DrawRectangle(x, Lerp(start_y, end_y, e->b), sz, sz, YELLOW); */
+    Vector2 b = cubic_bezier(e->b, e->points);
+    DrawRectangle(x, Lerp(start_y, end_y, b.y), sz, sz, YELLOW);
 }
 
 void draw_editor(const Editor *e) {
@@ -516,10 +527,21 @@ int main(void) {
     };
 
     ContextMenu interactive_menu = new_context_menu(&context_menu, CONTEXT_MENU_INTERACTIVE, "increase", "decrease", "reset", "editor");
-    ContextMenu editor_menu = new_context_menu(&context_menu, CONTEXT_MENU_EDITOR, "interactive");
+    ContextMenu editor_menu = new_context_menu(&context_menu, CONTEXT_MENU_EDITOR, "copy", "paste", "reset", "interactive");
     ContextMenu *curr_menu = &interactive_menu;
 
     APP_STATE app_state = APP_EDITOR;
+    switch (app_state) {
+    case APP_INTERACTIVE: {
+        curr_menu = &interactive_menu;
+    } break;
+    case APP_EDITOR: {
+        curr_menu = &editor_menu;
+    } break;
+    default: {
+        curr_menu = &interactive_menu;
+    } break;
+    }
     
     Interactive interactive = {
     	.last_curve_point_index = -1,
@@ -576,7 +598,6 @@ int main(void) {
             if (curr_menu->active) {
                 update_context_menu(curr_menu);
 
-                // TODO(kra53n): show points num in context menu
                 if (curr_menu->type == CONTEXT_MENU_INTERACTIVE && curr_menu->choosed >= 0) {
                     if (strcmp(curr_menu->options[curr_menu->choosed], "editor") == 0) {
                         app_state = APP_EDITOR;
@@ -634,7 +655,8 @@ int main(void) {
                 update_context_menu(curr_menu);
 
                 if (curr_menu->type == CONTEXT_MENU_EDITOR && curr_menu->choosed >= 0) {
-                    if (strcmp(curr_menu->options[curr_menu->choosed], "interactive") == 0) {
+                    if (strcmp(curr_menu->options[curr_menu->choosed], "copy") == 0) {
+                    } else if (strcmp(curr_menu->options[curr_menu->choosed], "interactive") == 0) {
                         app_state = APP_INTERACTIVE;
                         curr_menu = &interactive_menu;
                     }

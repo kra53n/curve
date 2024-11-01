@@ -457,9 +457,8 @@ void draw_animated_square_in_editor(const Editor *e) {
     float x = e->r.x + e->r.width + off;
     float start_y = e->r.y + e->r.height - sz;
     float end_y = e->r.y;
-    /* DrawRectangle(x, Lerp(start_y, end_y, e->b), sz, sz, YELLOW); */
     Vector2 b = cubic_bezier(e->b, e->points);
-    DrawRectangle(x, Lerp(start_y, end_y, b.y), sz, sz, YELLOW);
+    DrawRectangle(x, Lerp(start_y, end_y, b.y), sz, sz, point_col);
 }
 
 void draw_editor(const Editor *e) {

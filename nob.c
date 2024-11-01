@@ -13,7 +13,7 @@ int main(int argc, char **argv) {
     if (*argv && (strcmp(*argv, "build") == 0 || strcmp(*argv, "b") == 0)) {
         nob_mkdir_if_not_exists("build");
         nob_mkdir_if_not_exists("build/assets");
-        nob_cmd_append(&compile_cmd, "gcc", "-Wall", "-Wextra", "-mwindows", "-static", "-o", "build/"prog_name, sources, "-lraylib", "-lgdi32", "-lwinmm");
+        nob_cmd_append(&compile_cmd, "gcc", "-O3", "-mwindows", "-static", "-o", "build/"prog_name, sources, "-lraylib", "-lgdi32", "-lwinmm");
         nob_copy_directory_recursively("assets", "build/assets");
     } else {
         nob_cmd_append(&compile_cmd, "gcc", "-Wall", "-Wextra", "-o", prog_name, sources, "-lraylib", "-lgdi32", "-lwinmm");

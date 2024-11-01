@@ -15,4 +15,32 @@ void drawc(int x, int y, float r, Color c) {
     DrawCircle(x, y, r, c);
 }
 
+int ftoa(float f, char *buf)
+{
+	char *ptr = buf;
+	char c;
+    int precision = 8;
+
+	if (f < 0)
+	{
+		f = -f;
+		*ptr++ = '-';
+	}
+
+    *ptr++ = (int)f + '0';
+    f -= (int)f;
+
+    *ptr++ = '.';
+
+    while (precision--)
+    {
+        f *= 10.0;
+        c = f;
+        *ptr++ = c + '0';
+        f -= c;
+    }
+	*ptr = 0;
+	return ptr - buf;
+}
+
 #endif // UTILS_

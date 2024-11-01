@@ -10,8 +10,6 @@
 
 // TODO(kra53n): make glow affect for circles
 
-// TODO(kra53n): space should start and then if it was pressed again should stop cirve computing
-
 #define nil 0
 #define pi (atan2f(1, 1) * 4)
 #define MAX(a, b) (a > b ? a : b)
@@ -579,6 +577,20 @@ int scan_nums_to_vecs(const char *s, Vector2 points[4], const char *err) {
     return 0;
 }
 
+void copy_vecs_to_clipboard(Vector2 *vecs, int n) {
+    char buf[256];
+    char *ptr = buf;
+    for (int i = 0; i < n; i++) {
+        ptr += ftoa(vecs[i].x, ptr);
+        *ptr++ = ' ';
+        ptr += ftoa(vecs[i].y, ptr);
+        *ptr++ = '\r';
+        *ptr++ = '\n';
+    }
+    *(ptr-2) = 0;
+    SetClipboardText(buf);
+}
+
 int main(void) {
     ConfigFlags window_flags = FLAG_WINDOW_RESIZABLE;
 
@@ -731,9 +743,11 @@ int main(void) {
 
                 if (curr_menu->type == CONTEXT_MENU_EDITOR && curr_menu->choosed >= 0) {
                     if (strcmp(curr_menu->options[curr_menu->choosed], "copy") == 0) {
+                        copy_vecs_to_clipboard(editor.points, 4);
                     } else if (strcmp(curr_menu->options[curr_menu->choosed], "paste") == 0) {
                         char err[256];
                         scan_nums_to_vecs(GetClipboardText(), editor.points, err);
+                        // TODO(kra53n): make popup notifier
                         printf("err: %s\n", err);
                     } else if (strcmp(curr_menu->options[curr_menu->choosed], "interactive") == 0) {
                         app_state = APP_INTERACTIVE;

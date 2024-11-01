@@ -1,7 +1,7 @@
 # Bézier Curve editor
 
 Cubic [Bézier Curve](https://en.wikipedia.org/wiki/B%C3%A9zier_curve)
-editor and interactive demonstration of their construction.
+editor and interactive demonstration of it construction.
 
 ## Quick Start
 

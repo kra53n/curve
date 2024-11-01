@@ -15,8 +15,8 @@
 #define MAX(a, b) (a > b ? a : b)
 #define MIN(a, b) (a < b ? a : b)
 
-int screen_width = 720;
-int screen_height = 460;
+int screen_width = 1024;
+int screen_height = 648;
 
 Color point_col;
 Color point_col1;
@@ -43,6 +43,8 @@ typedef struct {
     Vector2 curr_point;
     int selected_point;
 } BezierCurve;
+
+#define CURVE_MAX_POINTS 20
 
 // b - B(t) from https://en.wikipedia.org/wiki/B%C3%A9zier_curve
 void compute_curve(BezierCurve *bc, float b, Vector2 *points, int n, int edges) {
@@ -121,26 +123,15 @@ int count_curve_edges(int n) {
     return n + count_curve_edges(n-1);
 }
 
-void init_quad_curve(BezierCurve *bc) {
-    bc->n = 3;
-    bc->points = (Vector2*)malloc(sizeof(Vector2) * bc->n);
-    bc->points[0] = (Vector2) { 0.2f, 0.8f, };
-    bc->points[1] = (Vector2) { 0.5f, 0.2f, };
-    bc->points[2] = (Vector2) { 0.8f, 0.8f, };
-    bc->edges = count_curve_edges(bc->n);
-    bc->inner_points = (Vector2*)malloc(sizeof(Vector2) * bc->edges);
-    bc->selected_point = -1;
-}
-
 void init_cubic_curve(BezierCurve *bc) {
     bc->n = 4;
-    bc->points = (Vector2*)malloc(sizeof(Vector2) * 20);
+    bc->points = (Vector2*)malloc(sizeof(Vector2) * CURVE_MAX_POINTS);
     bc->points[0] = (Vector2) { 0.2f, 0.2f, };
     bc->points[1] = (Vector2) { 0.4f, 0.8f, };
     bc->points[2] = (Vector2) { 0.6f, 0.8f, };
     bc->points[3] = (Vector2) { 0.8f, 0.2f, };
     bc->edges = count_curve_edges(bc->n);
-    bc->inner_points = (Vector2*)malloc(sizeof(Vector2) * count_curve_edges(20));
+    bc->inner_points = (Vector2*)malloc(sizeof(Vector2) * count_curve_edges(CURVE_MAX_POINTS));
     bc->selected_point = -1;
 }
 
@@ -594,7 +585,7 @@ void copy_vecs_to_clipboard(Vector2 *vecs, int n) {
 int main(void) {
     ConfigFlags window_flags = FLAG_WINDOW_RESIZABLE;
 
-    InitWindow(screen_width, screen_height, "bezier curve animation");
+    InitWindow(screen_width, screen_height, "bezier curve editor");
     SetWindowState(window_flags);
     SetTargetFPS(60);
 
@@ -697,7 +688,7 @@ int main(void) {
                         }
                         nil_b_in_interactive(&interactive);
                     } else if (strcmp(curr_menu->options[curr_menu->choosed], "increase") == 0) {
-                        if (interactive.bc.n+1 != 20) {
+                        if (interactive.bc.n+1 != CURVE_MAX_POINTS) {
                             int idx = get_max_distance_idx_beetween_vecs(interactive.bc.points, interactive.bc.n) + 1;
                             memmove(interactive.bc.points+(idx+1), interactive.bc.points+(idx), sizeof(Vector2)*(interactive.bc.n-idx+1));
                             interactive.bc.points[idx].x = (interactive.bc.points[idx-1].x + interactive.bc.points[idx+1].x) / 2;
@@ -774,6 +765,15 @@ int main(void) {
         }
     }
     CloseWindow();
+
+    free(interactive.bc.points);
+    free(interactive.bc.inner_points);
+
+    free(interactive_menu.option_widths);
+    free(interactive_menu.animations);
+
+    free(editor_menu.option_widths);
+    free(editor_menu.animations);
 
     return 0;
 }

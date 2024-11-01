@@ -638,6 +638,12 @@ int main(void) {
     };
     init_cubic_curve(&interactive.bc);
     
+    const Vector2 default_editor_points[4] = {
+        (Vector2){ 0.0f, 0.0f },
+        (Vector2){ 0.2f, 0.2f },
+        (Vector2){ 0.8f, 0.8f },
+        (Vector2){ 1.0f, 1.0f },
+    };
     Editor editor = {
         .max_sz = 700,
         .thick = 2,
@@ -646,13 +652,8 @@ int main(void) {
         .line_col = YELLOW,
         .line_col1 = (Color){0x80, 0x80, 0x80, 0xff},
         .point_drag = -1,
-        .points = {
-            (Vector2){ 0.0f, 0.0f },
-            (Vector2){ 0.2f, 0.2f },
-            (Vector2){ 0.8f, 0.8f },
-            (Vector2){ 1.0f, 1.0f },
-        },
     };
+    memcpy(editor.points, default_editor_points, sizeof(Vector2) * 4);
 
     while (!WindowShouldClose()) {
         Vector2 mouse = GetMousePosition();
@@ -748,7 +749,8 @@ int main(void) {
                         char err[256];
                         scan_nums_to_vecs(GetClipboardText(), editor.points, err);
                         // TODO(kra53n): make popup notifier
-                        printf("err: %s\n", err);
+                    } else if (strcmp(curr_menu->options[curr_menu->choosed], "reset") == 0) {
+                        memcpy(editor.points, default_editor_points, sizeof(Vector2) * 4);
                     } else if (strcmp(curr_menu->options[curr_menu->choosed], "interactive") == 0) {
                         app_state = APP_INTERACTIVE;
                         curr_menu = &interactive_menu;

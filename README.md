@@ -6,13 +6,13 @@ editor and interactive demonstration of their construction.
 ## Quick Start
 
 ```console
-$ gcc -o nob nob.c
-$ ./nob r
+gcc -o nob nob.c
+./nob r
 ```
 
 ## Build
 
 ```console
-$ gcc -o nob nob.c
-$ ./nob b
+gcc -o nob nob.c
+./nob b
 ```
